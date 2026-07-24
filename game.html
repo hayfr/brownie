@@ -2,253 +2,151 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brownie Stacker | The Brownie Bite</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍫</text></svg>">
+    <title>Brownie Bite | Game</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
-<body class="page-enter">
-
+<body>
     <nav>
         <ul>
-            <li><a href="index.html">History & Facts</a></li>
-            <li><a href="recipe.html">The Ultimate Recipe</a></li>
-            <li><a href="game.html">Brownie Stacker</a></li>
+            <li><a href="index.html">History</a></li>
+            <li><a href="recipe.html">Recipe</a></li>
+            <li><a href="game.html">Stack Game</a></li>
         </ul>
     </nav>
 
-    <div class="container" style="display: flex; flex-direction: column; align-items: center;">
-        <div style="text-align: center; margin-bottom: 1rem;">
-            <h2>Brownie Stacker</h2>
-            <p>Tap, click, or press <strong>Spacebar</strong> to place the brownie slab. Build it as high as you can!</p>
-        </div>
-
-        <div class="game-wrapper" id="gameWrapper">
+    <div class="container" style="text-align: center;">
+        <div class="game-container">
             <div class="game-ui">
-                <h3 id="highScoreText">High Score: 0</h3>
-                <h1 id="scoreText">0</h1>
+                <p>All-Time High: <span id="high-score">0</span></p>
+                <h3 id="current-score-label">Your Score:</h3>
+                <h1 id="score">0</h1>
             </div>
             <canvas id="gameCanvas"></canvas>
         </div>
-        
-        <button class="btn" id="restartBtn" style="display: none;">Play Again</button>
+        <button class="btn" onclick="startGame()">Start / Stack Brownie</button>
     </div>
 
+    <script src="transition.js"></script>
     <script>
-        // --- PAGE TRANSITION ---
-        document.querySelectorAll('nav a').forEach(link => {
-            link.addEventListener('click', function(e) {
-                if (this.href !== window.location.href) {
-                    e.preventDefault();
-                    document.body.classList.add('page-leave');
-                    setTimeout(() => { window.location.href = this.href; }, 400);
-                }
-            });
-        });
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const highScoreEl = document.getElementById('high-score');
 
-        // --- GAME LOGIC (Three.js) ---
-        let camera, scene, renderer;
+        // Load High Score
+        let highScore = localStorage.getItem('brownieStackHigh') || 0;
+        highScoreEl.innerText = highScore;
+
         let stack = [];
-        let overhangs = [];
-        const boxHeight = 1;
-        const originalBoxSize = 3;
-        let gameEnded = false;
-        let gameStarted = false;
-        
-        let score = 0;
-        let highScore = localStorage.getItem('brownieHighScore') || 0;
-        document.getElementById('highScoreText').innerText = `High Score: ${highScore}`;
+        let current = {};
+        let mode = 'waiting';
+        let speed = 2;
 
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
-        function playChopSound() {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        function startGame() {
+            if(mode === 'waiting' || mode === 'over') {
+                stack = [{ x: 0, y: 0, w: 150, h: 150, c: '#3d1c02' }];
+                newBlock();
+                mode = 'playing';
+            } else {
+                placeBlock();
+            }
         }
 
-        function initGame() {
-            scene = new THREE.Scene();
-
-            // Isometric Camera
-            const aspect = 500 / 600; // Wrapper size
-            const d = 5;
-            camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, -100, 100);
-            camera.position.set(10, 10, 10);
-            camera.lookAt(0, 0, 0);
-
-            // Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-            scene.add(ambientLight);
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.4);
-            dirLight.position.set(10, 20, 0);
-            scene.add(dirLight);
-
-            const canvas = document.getElementById('gameCanvas');
-            renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
-            renderer.setSize(500, 600);
-
-            // Reset variables
-            stack = [];
-            overhangs = [];
-            score = 0;
-            document.getElementById('scoreText').innerText = score;
-            gameEnded = false;
-            gameStarted = false;
-
-            // Base block (The starting brownie)
-            addLayer(0, 0, originalBoxSize, originalBoxSize);
-            // The first moving block
-            addLayer(-10, 0, originalBoxSize, originalBoxSize, 'x');
-
-            renderer.render(scene, camera);
+        function newBlock() {
+            const last = stack[stack.length - 1];
+            current = { 
+                x: -150, 
+                y: stack.length * -25, 
+                w: last.w, 
+                h: last.h, 
+                dir: 1 
+            };
         }
 
-        // Material for Brownie (Dark brown sides, slightly lighter top)
-        function getBrownieMaterial() {
-            return new THREE.MeshLambertMaterial({ color: 0x4A2511 }); // Chocolate color
-        }
-
-        function addLayer(x, z, width, depth, direction) {
-            const y = boxHeight * stack.length;
-            const geometry = new THREE.BoxGeometry(width, boxHeight, depth);
-            const material = getBrownieMaterial();
-            const mesh = new THREE.Mesh(geometry, material);
-            mesh.position.set(x, y, z);
+        function placeBlock() {
+            const last = stack[stack.length - 1];
+            const diff = current.x - last.x;
             
-            // Draw a slightly darker outline using EdgesGeometry for a stylized Ketchapp look
-            const edges = new THREE.EdgesGeometry(geometry);
-            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x2C1203 }));
-            mesh.add(line);
-
-            scene.add(mesh);
-            stack.push({ mesh, direction, width, depth });
-            return mesh;
-        }
-
-        function placeLayer() {
-            if(gameEnded) return;
-            if(!gameStarted) {
-                gameStarted = true;
+            if (Math.abs(diff) >= current.w) {
+                mode = 'over';
+                if(stack.length-1 > highScore) {
+                    highScore = stack.length-1;
+                    localStorage.setItem('brownieStackHigh', highScore);
+                    highScoreEl.innerText = highScore;
+                }
+                alert("The brownie fell! Score: " + (stack.length-1));
                 return;
             }
 
-            const currentLayer = stack[stack.length - 1];
-            const previousLayer = stack[stack.length - 2];
+            // Slice block
+            if(diff > 0) current.w -= diff;
+            else { current.w += diff; current.x = last.x; }
 
-            let direction = currentLayer.direction;
-            let size = direction === 'x' ? currentLayer.width : currentLayer.depth;
-            let delta = currentLayer.mesh.position[direction] - previousLayer.mesh.position[direction];
-            let overhangSize = Math.abs(delta);
-            let overlap = size - overhangSize;
-
-            if (overlap > 0) {
-                playChopSound();
-                score++;
-                document.getElementById('scoreText').innerText = score;
-                
-                if (score > highScore) {
-                    highScore = score;
-                    localStorage.setItem('brownieHighScore', highScore);
-                    document.getElementById('highScoreText').innerText = `High Score: ${highScore}`;
-                }
-
-                // Slice the block
-                const newWidth = direction === 'x' ? overlap : currentLayer.width;
-                const newDepth = direction === 'z' ? overlap : currentLayer.depth;
-
-                currentLayer.width = newWidth;
-                currentLayer.depth = newDepth;
-
-                currentLayer.mesh.scale[direction] = overlap / size;
-                currentLayer.mesh.position[direction] -= delta / 2;
-
-                // Create falling overhang
-                const overhangShift = (overlap / 2 + overhangSize / 2) * Math.sign(delta);
-                const overhangX = direction === 'x' ? currentLayer.mesh.position.x + overhangShift : currentLayer.mesh.position.x;
-                const overhangZ = direction === 'z' ? currentLayer.mesh.position.z + overhangShift : currentLayer.mesh.position.z;
-                const overhangW = direction === 'x' ? overhangSize : newWidth;
-                const overhangD = direction === 'z' ? overhangSize : newDepth;
-
-                const overhangGeo = new THREE.BoxGeometry(overhangW, boxHeight, overhangD);
-                const overhangMesh = new THREE.Mesh(overhangGeo, getBrownieMaterial());
-                overhangMesh.position.set(overhangX, currentLayer.mesh.position.y, overhangZ);
-                scene.add(overhangMesh);
-                overhangs.push(overhangMesh);
-
-                // Spawn Next Layer
-                const nextX = direction === 'x' ? currentLayer.mesh.position.x : -10;
-                const nextZ = direction === 'z' ? currentLayer.mesh.position.z : -10;
-                addLayer(nextX, nextZ, newWidth, newDepth, direction === 'x' ? 'z' : 'x');
-            } else {
-                gameOver();
-            }
+            stack.push({...current, c: '#4e2a0f'});
+            scoreEl.innerText = stack.length - 1;
+            newBlock();
         }
 
-        function gameOver() {
-            gameEnded = true;
-            document.getElementById('restartBtn').style.display = 'block';
-            scene.remove(stack[stack.length - 1].mesh); // Remove the floating one
+        // ISOMETRIC DRAWING MATH
+        function drawIsoBox(x, y, z, w, h, color) {
+            // Transform coordinates to Isometric angle
+            const isoX = (x - z) + canvas.width/2;
+            const isoY = (x + z) / 2 + y + 350;
+
+            const height = 25; // thickness of brownie
+
+            // Right Face
+            ctx.fillStyle = '#2C1203';
+            ctx.beginPath();
+            ctx.moveTo(isoX, isoY);
+            ctx.lineTo(isoX + w, isoY - w/2);
+            ctx.lineTo(isoX + w, isoY - w/2 + height);
+            ctx.lineTo(isoX, isoY + height);
+            ctx.fill();
+
+            // Left Face
+            ctx.fillStyle = '#3d1c02';
+            ctx.beginPath();
+            ctx.moveTo(isoX, isoY);
+            ctx.lineTo(isoX - h, isoY - h/2);
+            ctx.lineTo(isoX - h, isoY - h/2 + height);
+            ctx.lineTo(isoX, isoY + height);
+            ctx.fill();
+
+            // Top Face (The Brownie Surface)
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(isoX, isoY);
+            ctx.lineTo(isoX + w, isoY - w/2);
+            ctx.lineTo(isoX + w - h, isoY - (w + h)/2);
+            ctx.lineTo(isoX - h, isoY - h/2);
+            ctx.fill();
+        }
+
+        function loop() {
+            ctx.clearRect(0,0,400,500);
             
-            // Let the missed one fall
-            const missedGeo = new THREE.BoxGeometry(stack[stack.length - 1].width, boxHeight, stack[stack.length - 1].depth);
-            const missedMesh = new THREE.Mesh(missedGeo, getBrownieMaterial());
-            missedMesh.position.copy(stack[stack.length - 1].mesh.position);
-            scene.add(missedMesh);
-            overhangs.push(missedMesh);
-        }
-
-        // Animation Loop
-        function animate() {
-            requestAnimationFrame(animate);
-
-            if (gameStarted && !gameEnded) {
-                const currentLayer = stack[stack.length - 1];
-                const speed = 0.15 + (score * 0.005);
-                
-                // Swing block back and forth
-                const time = performance.now() / (1000 / speed);
-                currentLayer.mesh.position[currentLayer.direction] = Math.sin(time) * 5;
+            if(mode === 'playing') {
+                current.x += speed * current.dir;
+                if(current.x > 150 || current.x < -150) current.dir *= -1;
             }
 
-            // Move Camera up smoothly
-            if (camera.position.y < boxHeight * (stack.length - 2) + 10) {
-                camera.position.y += 0.1;
-            }
-
-            // Drop overhangs
-            overhangs.forEach(mesh => {
-                mesh.position.y -= 0.2;
+            // Draw stack
+            stack.forEach((b, i) => {
+                const color = i === 0 ? '#2C1203' : '#4e2a0f';
+                drawIsoBox(b.x, b.y, 0, b.w, b.h, color);
             });
 
-            renderer.render(scene, camera);
+            if(mode === 'playing') {
+                drawIsoBox(current.x, current.y, 0, current.w, current.h, '#6d3d1e');
+            }
+
+            requestAnimationFrame(loop);
         }
 
-        // Controls
-        const wrapper = document.getElementById('gameWrapper');
-        wrapper.addEventListener('pointerdown', placeLayer);
-        window.addEventListener('keydown', (e) => {
-            if(e.code === 'Space') {
-                e.preventDefault();
-                placeLayer();
-            }
-        });
-
-        document.getElementById('restartBtn').addEventListener('click', () => {
-            document.getElementById('restartBtn').style.display = 'none';
-            initGame();
-        });
-
-        initGame();
-        animate();
+        canvas.width = 400;
+        canvas.height = 500;
+        loop();
     </script>
 </body>
 </html>
