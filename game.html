@@ -3,220 +3,252 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brownie Tower Game | The Brownie Bite</title>
+    <title>Brownie Stacker | The Brownie Bite</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍫</text></svg>">
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
-<body>
+<body class="page-enter">
 
     <nav>
         <ul>
             <li><a href="index.html">History & Facts</a></li>
             <li><a href="recipe.html">The Ultimate Recipe</a></li>
-            <li><a href="game.html">Brownie Tower Game</a></li>
+            <li><a href="game.html">Brownie Stacker</a></li>
         </ul>
     </nav>
 
-    <div class="container fade-in">
-        <div class="card game-container">
-            <h1>Brownie Stacker</h1>
-            <p>Stack the brownie slabs as high as you can! Click the button or press <strong>Spacebar</strong> to drop the sliding slab. Time it perfectly to avoid losing pieces of your brownie.</p>
-            
-            <h2 style="margin-top: 1rem;">Score: <span id="score">0</span></h2>
-            
-            <canvas id="gameCanvas" width="400" height="500"></canvas>
-            
-            <button class="btn" id="actionBtn">Start / Drop Brownie</button>
+    <div class="container" style="display: flex; flex-direction: column; align-items: center;">
+        <div style="text-align: center; margin-bottom: 1rem;">
+            <h2>Brownie Stacker</h2>
+            <p>Tap, click, or press <strong>Spacebar</strong> to place the brownie slab. Build it as high as you can!</p>
         </div>
+
+        <div class="game-wrapper" id="gameWrapper">
+            <div class="game-ui">
+                <h3 id="highScoreText">High Score: 0</h3>
+                <h1 id="scoreText">0</h1>
+            </div>
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        
+        <button class="btn" id="restartBtn" style="display: none;">Play Again</button>
     </div>
 
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const scoreElement = document.getElementById('score');
-        const actionBtn = document.getElementById('actionBtn');
+        // --- PAGE TRANSITION ---
+        document.querySelectorAll('nav a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                if (this.href !== window.location.href) {
+                    e.preventDefault();
+                    document.body.classList.add('page-leave');
+                    setTimeout(() => { window.location.href = this.href; }, 400);
+                }
+            });
+        });
 
-        // Game state
-        let state = 'start'; // start, playing, gameover
+        // --- GAME LOGIC (Three.js) ---
+        let camera, scene, renderer;
+        let stack = [];
+        let overhangs = [];
+        const boxHeight = 1;
+        const originalBoxSize = 3;
+        let gameEnded = false;
+        let gameStarted = false;
+        
         let score = 0;
-        let blocks = [];
-        let currentBlock;
-        let scrollY = 0;
+        let highScore = localStorage.getItem('brownieHighScore') || 0;
+        document.getElementById('highScoreText').innerText = `High Score: ${highScore}`;
 
-        // Block settings
-        const blockHeight = 30;
-        const speedMultiplier = 0.2;
-
-        // Audio Context (Synthesized Sounds)
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
-        function playSound(type) {
-            if(audioCtx.state === 'suspended') audioCtx.resume();
+        function playChopSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            
-            if (type === 'drop') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.1);
-            } else if (type === 'over') {
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
-                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.5);
-            }
-        }
-
-        class Block {
-            constructor(x, y, width, direction, speed) {
-                this.x = x;
-                this.y = y;
-                this.width = width;
-                this.height = blockHeight;
-                this.direction = direction;
-                this.speed = speed;
-                this.color = `#${Math.floor(Math.random()*2 + 3)}C1${Math.floor(Math.random()*4 + 2)}03`; // Random shades of chocolate
-            }
-
-            draw() {
-                // Draw base brownie
-                ctx.fillStyle = '#3d1c00'; // Dark choc
-                ctx.fillRect(this.x, this.y + scrollY, this.width, this.height);
-                
-                // Draw lighter chocolate frosting top
-                ctx.fillStyle = '#5c2a00';
-                ctx.fillRect(this.x, this.y + scrollY, this.width, this.height - 5);
-                
-                // Outline
-                ctx.strokeStyle = '#2C1203';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(this.x, this.y + scrollY, this.width, this.height);
-            }
-
-            update() {
-                this.x += this.speed * this.direction;
-                if (this.x <= 0 || this.x + this.width >= canvas.width) {
-                    this.direction *= -1; // Reverse direction on wall hit
-                }
-            }
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
         }
 
         function initGame() {
-            blocks = [];
+            scene = new THREE.Scene();
+
+            // Isometric Camera
+            const aspect = 500 / 600; // Wrapper size
+            const d = 5;
+            camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, -100, 100);
+            camera.position.set(10, 10, 10);
+            camera.lookAt(0, 0, 0);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.4);
+            dirLight.position.set(10, 20, 0);
+            scene.add(dirLight);
+
+            const canvas = document.getElementById('gameCanvas');
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+            renderer.setSize(500, 600);
+
+            // Reset variables
+            stack = [];
+            overhangs = [];
             score = 0;
-            scrollY = 0;
-            scoreElement.innerText = score;
-            
-            // Base block
-            blocks.push(new Block(100, canvas.height - blockHeight, 200, 0, 0));
-            
-            spawnBlock();
-            state = 'playing';
-            actionBtn.innerText = "Drop Brownie!";
-            gameLoop();
+            document.getElementById('scoreText').innerText = score;
+            gameEnded = false;
+            gameStarted = false;
+
+            // Base block (The starting brownie)
+            addLayer(0, 0, originalBoxSize, originalBoxSize);
+            // The first moving block
+            addLayer(-10, 0, originalBoxSize, originalBoxSize, 'x');
+
+            renderer.render(scene, camera);
         }
 
-        function spawnBlock() {
-            let lastBlock = blocks[blocks.length - 1];
-            let yPos = lastBlock.y - blockHeight;
-            let speed = 2 + (score * speedMultiplier); // Gets faster
-            currentBlock = new Block(0, yPos, lastBlock.width, 1, speed);
-            
-            // Pan camera up if getting too high
-            if (yPos + scrollY < 150) {
-                scrollY += blockHeight;
-            }
+        // Material for Brownie (Dark brown sides, slightly lighter top)
+        function getBrownieMaterial() {
+            return new THREE.MeshLambertMaterial({ color: 0x4A2511 }); // Chocolate color
         }
 
-        function placeBlock() {
-            playSound('drop');
-            let lastBlock = blocks[blocks.length - 1];
+        function addLayer(x, z, width, depth, direction) {
+            const y = boxHeight * stack.length;
+            const geometry = new THREE.BoxGeometry(width, boxHeight, depth);
+            const material = getBrownieMaterial();
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(x, y, z);
             
-            // Calculate overlap
-            let overlapStart = Math.max(currentBlock.x, lastBlock.x);
-            let overlapEnd = Math.min(currentBlock.x + currentBlock.width, lastBlock.x + lastBlock.width);
-            let overlapWidth = overlapEnd - overlapStart;
+            // Draw a slightly darker outline using EdgesGeometry for a stylized Ketchapp look
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x2C1203 }));
+            mesh.add(line);
 
-            if (overlapWidth <= 0) {
-                // Missed completely
-                state = 'gameover';
-                playSound('over');
-                actionBtn.innerText = "Game Over - Try Again";
+            scene.add(mesh);
+            stack.push({ mesh, direction, width, depth });
+            return mesh;
+        }
+
+        function placeLayer() {
+            if(gameEnded) return;
+            if(!gameStarted) {
+                gameStarted = true;
                 return;
             }
 
-            // Cut the block
-            currentBlock.x = overlapStart;
-            currentBlock.width = overlapWidth;
-            currentBlock.speed = 0; // Stop moving
-            
-            blocks.push(currentBlock);
-            score++;
-            scoreElement.innerText = score;
-            
-            spawnBlock();
-        }
+            const currentLayer = stack[stack.length - 1];
+            const previousLayer = stack[stack.length - 2];
 
-        function drawBackground() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // Draw grid lines for clean layout feel
-            ctx.strokeStyle = 'rgba(139, 90, 51, 0.1)';
-            ctx.lineWidth = 1;
-            for(let i=0; i<canvas.width; i+=40) {
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+            let direction = currentLayer.direction;
+            let size = direction === 'x' ? currentLayer.width : currentLayer.depth;
+            let delta = currentLayer.mesh.position[direction] - previousLayer.mesh.position[direction];
+            let overhangSize = Math.abs(delta);
+            let overlap = size - overhangSize;
+
+            if (overlap > 0) {
+                playChopSound();
+                score++;
+                document.getElementById('scoreText').innerText = score;
+                
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('brownieHighScore', highScore);
+                    document.getElementById('highScoreText').innerText = `High Score: ${highScore}`;
+                }
+
+                // Slice the block
+                const newWidth = direction === 'x' ? overlap : currentLayer.width;
+                const newDepth = direction === 'z' ? overlap : currentLayer.depth;
+
+                currentLayer.width = newWidth;
+                currentLayer.depth = newDepth;
+
+                currentLayer.mesh.scale[direction] = overlap / size;
+                currentLayer.mesh.position[direction] -= delta / 2;
+
+                // Create falling overhang
+                const overhangShift = (overlap / 2 + overhangSize / 2) * Math.sign(delta);
+                const overhangX = direction === 'x' ? currentLayer.mesh.position.x + overhangShift : currentLayer.mesh.position.x;
+                const overhangZ = direction === 'z' ? currentLayer.mesh.position.z + overhangShift : currentLayer.mesh.position.z;
+                const overhangW = direction === 'x' ? overhangSize : newWidth;
+                const overhangD = direction === 'z' ? overhangSize : newDepth;
+
+                const overhangGeo = new THREE.BoxGeometry(overhangW, boxHeight, overhangD);
+                const overhangMesh = new THREE.Mesh(overhangGeo, getBrownieMaterial());
+                overhangMesh.position.set(overhangX, currentLayer.mesh.position.y, overhangZ);
+                scene.add(overhangMesh);
+                overhangs.push(overhangMesh);
+
+                // Spawn Next Layer
+                const nextX = direction === 'x' ? currentLayer.mesh.position.x : -10;
+                const nextZ = direction === 'z' ? currentLayer.mesh.position.z : -10;
+                addLayer(nextX, nextZ, newWidth, newDepth, direction === 'x' ? 'z' : 'x');
+            } else {
+                gameOver();
             }
-            for(let i=0; i<canvas.height; i+=40) {
-                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+        }
+
+        function gameOver() {
+            gameEnded = true;
+            document.getElementById('restartBtn').style.display = 'block';
+            scene.remove(stack[stack.length - 1].mesh); // Remove the floating one
+            
+            // Let the missed one fall
+            const missedGeo = new THREE.BoxGeometry(stack[stack.length - 1].width, boxHeight, stack[stack.length - 1].depth);
+            const missedMesh = new THREE.Mesh(missedGeo, getBrownieMaterial());
+            missedMesh.position.copy(stack[stack.length - 1].mesh.position);
+            scene.add(missedMesh);
+            overhangs.push(missedMesh);
+        }
+
+        // Animation Loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (gameStarted && !gameEnded) {
+                const currentLayer = stack[stack.length - 1];
+                const speed = 0.15 + (score * 0.005);
+                
+                // Swing block back and forth
+                const time = performance.now() / (1000 / speed);
+                currentLayer.mesh.position[currentLayer.direction] = Math.sin(time) * 5;
             }
-        }
 
-        function gameLoop() {
-            if (state !== 'playing') return;
-            
-            drawBackground();
-            
-            blocks.forEach(b => b.draw());
-            
-            currentBlock.update();
-            currentBlock.draw();
-            
-            requestAnimationFrame(gameLoop);
-        }
-
-        // Event Listeners
-        function handleAction() {
-            if (state === 'start' || state === 'gameover') {
-                initGame();
-            } else if (state === 'playing') {
-                placeBlock();
+            // Move Camera up smoothly
+            if (camera.position.y < boxHeight * (stack.length - 2) + 10) {
+                camera.position.y += 0.1;
             }
+
+            // Drop overhangs
+            overhangs.forEach(mesh => {
+                mesh.position.y -= 0.2;
+            });
+
+            renderer.render(scene, camera);
         }
 
-        actionBtn.addEventListener('click', handleAction);
-        
+        // Controls
+        const wrapper = document.getElementById('gameWrapper');
+        wrapper.addEventListener('pointerdown', placeLayer);
         window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
+            if(e.code === 'Space') {
                 e.preventDefault();
-                handleAction();
+                placeLayer();
             }
         });
 
-        // Initial draw
-        drawBackground();
-        ctx.fillStyle = '#4A2511';
-        ctx.font = '20px Poppins';
-        ctx.textAlign = 'center';
-        ctx.fillText("Press Start to Bake the Tower", canvas.width/2, canvas.height/2);
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            document.getElementById('restartBtn').style.display = 'none';
+            initGame();
+        });
 
+        initGame();
+        animate();
     </script>
 </body>
 </html>
