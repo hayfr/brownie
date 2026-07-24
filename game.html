@@ -2,151 +2,221 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Brownie Bite | Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brownie Tower Game | The Brownie Bite</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍫</text></svg>">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
     <nav>
         <ul>
-            <li><a href="index.html">History</a></li>
-            <li><a href="recipe.html">Recipe</a></li>
-            <li><a href="game.html">Stack Game</a></li>
+            <li><a href="index.html">History & Facts</a></li>
+            <li><a href="recipe.html">The Ultimate Recipe</a></li>
+            <li><a href="game.html">Brownie Tower Game</a></li>
         </ul>
     </nav>
 
-    <div class="container" style="text-align: center;">
-        <div class="game-container">
-            <div class="game-ui">
-                <p>All-Time High: <span id="high-score">0</span></p>
-                <h3 id="current-score-label">Your Score:</h3>
-                <h1 id="score">0</h1>
-            </div>
-            <canvas id="gameCanvas"></canvas>
+    <div class="container fade-in">
+        <div class="card game-container">
+            <h1>Brownie Stacker</h1>
+            <p>Stack the brownie slabs as high as you can! Click the button or press <strong>Spacebar</strong> to drop the sliding slab. Time it perfectly to avoid losing pieces of your brownie.</p>
+            
+            <h2 style="margin-top: 1rem;">Score: <span id="score">0</span></h2>
+            
+            <canvas id="gameCanvas" width="400" height="500"></canvas>
+            
+            <button class="btn" id="actionBtn">Start / Drop Brownie</button>
         </div>
-        <button class="btn" onclick="startGame()">Start / Stack Brownie</button>
     </div>
 
-    <script src="transition.js"></script>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const scoreEl = document.getElementById('score');
-        const highScoreEl = document.getElementById('high-score');
+        const scoreElement = document.getElementById('score');
+        const actionBtn = document.getElementById('actionBtn');
 
-        // Load High Score
-        let highScore = localStorage.getItem('brownieStackHigh') || 0;
-        highScoreEl.innerText = highScore;
+        // Game state
+        let state = 'start'; // start, playing, gameover
+        let score = 0;
+        let blocks = [];
+        let currentBlock;
+        let scrollY = 0;
 
-        let stack = [];
-        let current = {};
-        let mode = 'waiting';
-        let speed = 2;
+        // Block settings
+        const blockHeight = 30;
+        const speedMultiplier = 0.2;
 
-        function startGame() {
-            if(mode === 'waiting' || mode === 'over') {
-                stack = [{ x: 0, y: 0, w: 150, h: 150, c: '#3d1c02' }];
-                newBlock();
-                mode = 'playing';
-            } else {
+        // Audio Context (Synthesized Sounds)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            if (type === 'drop') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'over') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.5);
+            }
+        }
+
+        class Block {
+            constructor(x, y, width, direction, speed) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = blockHeight;
+                this.direction = direction;
+                this.speed = speed;
+                this.color = `#${Math.floor(Math.random()*2 + 3)}C1${Math.floor(Math.random()*4 + 2)}03`; // Random shades of chocolate
+            }
+
+            draw() {
+                // Draw base brownie
+                ctx.fillStyle = '#3d1c00'; // Dark choc
+                ctx.fillRect(this.x, this.y + scrollY, this.width, this.height);
+                
+                // Draw lighter chocolate frosting top
+                ctx.fillStyle = '#5c2a00';
+                ctx.fillRect(this.x, this.y + scrollY, this.width, this.height - 5);
+                
+                // Outline
+                ctx.strokeStyle = '#2C1203';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x, this.y + scrollY, this.width, this.height);
+            }
+
+            update() {
+                this.x += this.speed * this.direction;
+                if (this.x <= 0 || this.x + this.width >= canvas.width) {
+                    this.direction *= -1; // Reverse direction on wall hit
+                }
+            }
+        }
+
+        function initGame() {
+            blocks = [];
+            score = 0;
+            scrollY = 0;
+            scoreElement.innerText = score;
+            
+            // Base block
+            blocks.push(new Block(100, canvas.height - blockHeight, 200, 0, 0));
+            
+            spawnBlock();
+            state = 'playing';
+            actionBtn.innerText = "Drop Brownie!";
+            gameLoop();
+        }
+
+        function spawnBlock() {
+            let lastBlock = blocks[blocks.length - 1];
+            let yPos = lastBlock.y - blockHeight;
+            let speed = 2 + (score * speedMultiplier); // Gets faster
+            currentBlock = new Block(0, yPos, lastBlock.width, 1, speed);
+            
+            // Pan camera up if getting too high
+            if (yPos + scrollY < 150) {
+                scrollY += blockHeight;
+            }
+        }
+
+        function placeBlock() {
+            playSound('drop');
+            let lastBlock = blocks[blocks.length - 1];
+            
+            // Calculate overlap
+            let overlapStart = Math.max(currentBlock.x, lastBlock.x);
+            let overlapEnd = Math.min(currentBlock.x + currentBlock.width, lastBlock.x + lastBlock.width);
+            let overlapWidth = overlapEnd - overlapStart;
+
+            if (overlapWidth <= 0) {
+                // Missed completely
+                state = 'gameover';
+                playSound('over');
+                actionBtn.innerText = "Game Over - Try Again";
+                return;
+            }
+
+            // Cut the block
+            currentBlock.x = overlapStart;
+            currentBlock.width = overlapWidth;
+            currentBlock.speed = 0; // Stop moving
+            
+            blocks.push(currentBlock);
+            score++;
+            scoreElement.innerText = score;
+            
+            spawnBlock();
+        }
+
+        function drawBackground() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Draw grid lines for clean layout feel
+            ctx.strokeStyle = 'rgba(139, 90, 51, 0.1)';
+            ctx.lineWidth = 1;
+            for(let i=0; i<canvas.width; i+=40) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+            }
+            for(let i=0; i<canvas.height; i+=40) {
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+            }
+        }
+
+        function gameLoop() {
+            if (state !== 'playing') return;
+            
+            drawBackground();
+            
+            blocks.forEach(b => b.draw());
+            
+            currentBlock.update();
+            currentBlock.draw();
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event Listeners
+        function handleAction() {
+            if (state === 'start' || state === 'gameover') {
+                initGame();
+            } else if (state === 'playing') {
                 placeBlock();
             }
         }
 
-        function newBlock() {
-            const last = stack[stack.length - 1];
-            current = { 
-                x: -150, 
-                y: stack.length * -25, 
-                w: last.w, 
-                h: last.h, 
-                dir: 1 
-            };
-        }
-
-        function placeBlock() {
-            const last = stack[stack.length - 1];
-            const diff = current.x - last.x;
-            
-            if (Math.abs(diff) >= current.w) {
-                mode = 'over';
-                if(stack.length-1 > highScore) {
-                    highScore = stack.length-1;
-                    localStorage.setItem('brownieStackHigh', highScore);
-                    highScoreEl.innerText = highScore;
-                }
-                alert("The brownie fell! Score: " + (stack.length-1));
-                return;
+        actionBtn.addEventListener('click', handleAction);
+        
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                handleAction();
             }
+        });
 
-            // Slice block
-            if(diff > 0) current.w -= diff;
-            else { current.w += diff; current.x = last.x; }
+        // Initial draw
+        drawBackground();
+        ctx.fillStyle = '#4A2511';
+        ctx.font = '20px Poppins';
+        ctx.textAlign = 'center';
+        ctx.fillText("Press Start to Bake the Tower", canvas.width/2, canvas.height/2);
 
-            stack.push({...current, c: '#4e2a0f'});
-            scoreEl.innerText = stack.length - 1;
-            newBlock();
-        }
-
-        // ISOMETRIC DRAWING MATH
-        function drawIsoBox(x, y, z, w, h, color) {
-            // Transform coordinates to Isometric angle
-            const isoX = (x - z) + canvas.width/2;
-            const isoY = (x + z) / 2 + y + 350;
-
-            const height = 25; // thickness of brownie
-
-            // Right Face
-            ctx.fillStyle = '#2C1203';
-            ctx.beginPath();
-            ctx.moveTo(isoX, isoY);
-            ctx.lineTo(isoX + w, isoY - w/2);
-            ctx.lineTo(isoX + w, isoY - w/2 + height);
-            ctx.lineTo(isoX, isoY + height);
-            ctx.fill();
-
-            // Left Face
-            ctx.fillStyle = '#3d1c02';
-            ctx.beginPath();
-            ctx.moveTo(isoX, isoY);
-            ctx.lineTo(isoX - h, isoY - h/2);
-            ctx.lineTo(isoX - h, isoY - h/2 + height);
-            ctx.lineTo(isoX, isoY + height);
-            ctx.fill();
-
-            // Top Face (The Brownie Surface)
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.moveTo(isoX, isoY);
-            ctx.lineTo(isoX + w, isoY - w/2);
-            ctx.lineTo(isoX + w - h, isoY - (w + h)/2);
-            ctx.lineTo(isoX - h, isoY - h/2);
-            ctx.fill();
-        }
-
-        function loop() {
-            ctx.clearRect(0,0,400,500);
-            
-            if(mode === 'playing') {
-                current.x += speed * current.dir;
-                if(current.x > 150 || current.x < -150) current.dir *= -1;
-            }
-
-            // Draw stack
-            stack.forEach((b, i) => {
-                const color = i === 0 ? '#2C1203' : '#4e2a0f';
-                drawIsoBox(b.x, b.y, 0, b.w, b.h, color);
-            });
-
-            if(mode === 'playing') {
-                drawIsoBox(current.x, current.y, 0, current.w, current.h, '#6d3d1e');
-            }
-
-            requestAnimationFrame(loop);
-        }
-
-        canvas.width = 400;
-        canvas.height = 500;
-        loop();
     </script>
 </body>
 </html>
