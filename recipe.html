@@ -7,17 +7,17 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍫</text></svg>">
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="page-enter">
 
     <nav>
         <ul>
             <li><a href="index.html">History & Facts</a></li>
             <li><a href="recipe.html">The Ultimate Recipe</a></li>
-            <li><a href="game.html">Brownie Tower Game</a></li>
+            <li><a href="game.html">Brownie Stacker</a></li>
         </ul>
     </nav>
 
-    <div class="container fade-in">
+    <div class="container">
         <div class="card">
             <h1 style="text-align: center;">The Ultimate Fudgy Brownie</h1>
             <p style="text-align: center; margin-bottom: 2rem;">A perfectly crinkly top with a dense, chocolatey center.</p>
@@ -34,41 +34,13 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>Unsalted Butter</td>
-                                <td>1/2 cup (115g)</td>
-                                <td>Melted & hot</td>
-                            </tr>
-                            <tr>
-                                <td>Vegetable Oil</td>
-                                <td>1 tbsp</td>
-                                <td>For chewiness</td>
-                            </tr>
-                            <tr>
-                                <td>White Sugar</td>
-                                <td>1 1/8 cup (225g)</td>
-                                <td>Creates the crinkle top</td>
-                            </tr>
-                            <tr>
-                                <td>Large Eggs</td>
-                                <td>2</td>
-                                <td>Room temperature</td>
-                            </tr>
-                            <tr>
-                                <td>Vanilla Extract</td>
-                                <td>2 tsp</td>
-                                <td>Enhances flavor</td>
-                            </tr>
-                            <tr>
-                                <td>All-Purpose Flour</td>
-                                <td>1/2 cup (65g)</td>
-                                <td>Sifted</td>
-                            </tr>
-                            <tr>
-                                <td>Cocoa Powder</td>
-                                <td>1/2 cup (50g)</td>
-                                <td>Unsweetened</td>
-                            </tr>
+                            <tr><td>Unsalted Butter</td><td>1/2 cup (115g)</td><td>Melted & hot</td></tr>
+                            <tr><td>Vegetable Oil</td><td>1 tbsp</td><td>For chewiness</td></tr>
+                            <tr><td>White Sugar</td><td>1 1/8 cup (225g)</td><td>Creates the crinkle top</td></tr>
+                            <tr><td>Large Eggs</td><td>2</td><td>Room temperature</td></tr>
+                            <tr><td>Vanilla Extract</td><td>2 tsp</td><td>Enhances flavor</td></tr>
+                            <tr><td>All-Purpose Flour</td><td>1/2 cup (65g)</td><td>Sifted</td></tr>
+                            <tr><td>Cocoa Powder</td><td>1/2 cup (50g)</td><td>Unsweetened</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -76,16 +48,41 @@
                 <div>
                     <h3>Instructions</h3>
                     <ol style="margin-left: 20px; margin-top: 1rem; display: flex; flex-direction: column; gap: 10px;">
-                        <li><strong>Preheat:</strong> Preheat your oven to 350°F (175°C). Line an 8x8 inch pan with parchment paper.</li>
-                        <li><strong>Mix Wet Ingredients:</strong> In a large bowl, whisk together the hot melted butter, oil, and sugar for about a minute. Add the eggs and vanilla, beating until lighter in color (this helps form the glossy top).</li>
-                        <li><strong>Add Dry Ingredients:</strong> Sift in the flour, cocoa powder, and a pinch of salt. Gently fold the mixture with a spatula until *just* combined. Do not overmix!</li>
-                        <li><strong>Bake:</strong> Pour the batter into the prepared pan. Bake for 20-25 minutes. A toothpick inserted in the center should come out dirty for fudgy brownies.</li>
-                        <li><strong>Cool:</strong> Let them cool completely in the pan before slicing. Enjoy!</li>
+                        <li><strong>Preheat:</strong> Preheat oven to 350°F (175°C). Line an 8x8 pan with parchment.</li>
+                        <li><strong>Mix Wet:</strong> Whisk hot melted butter, oil, and sugar for a minute. Add eggs and vanilla, beating until lighter in color.</li>
+                        <li><strong>Add Dry:</strong> Sift in flour, cocoa powder, and salt. Fold gently with a spatula until just combined.</li>
+                        <li><strong>Bake:</strong> Pour batter into pan. Bake 20-25 minutes. A toothpick in the center should come out dirty.</li>
+                        <li><strong>Cool:</strong> Let cool completely before slicing. Enjoy!</li>
                     </ol>
                 </div>
             </div>
         </div>
     </div>
 
+    <script>
+        document.querySelectorAll('nav a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                if (this.href !== window.location.href) {
+                    e.preventDefault();
+                    
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.1);
+
+                    document.body.classList.add('page-leave');
+                    setTimeout(() => { window.location.href = this.href; }, 400);
+                }
+            });
+        });
+    </script>
 </body>
 </html>
