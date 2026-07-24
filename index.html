@@ -7,44 +7,75 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍫</text></svg>">
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="page-enter">
 
     <nav>
         <ul>
             <li><a href="index.html">History & Facts</a></li>
             <li><a href="recipe.html">The Ultimate Recipe</a></li>
-            <li><a href="game.html">Brownie Tower Game</a></li>
+            <li><a href="game.html">Brownie Stacker</a></li>
         </ul>
     </nav>
 
-    <div class="container fade-in">
+    <div class="container">
         <header class="card" style="text-align: center; background-color: var(--choc-med); color: white;">
             <h1 style="color: var(--cream); font-size: 3rem;">Welcome to The Brownie Bite</h1>
-            <p><strong>Our Purpose:</strong> To celebrate, educate, and share the joy of the ultimate baked good. Whether you love them fudgy, cakey, or loaded with nuts, this site is dedicated to honoring the rich history and undeniable magic of the chocolate brownie.</p>
+            <p><strong>Our Purpose:</strong> To celebrate, educate, and share the joy of the ultimate baked good. Whether you love them fudgy, cakey, or loaded with nuts, this site honors the rich history and magic of the chocolate brownie.</p>
         </header>
 
         <div class="container grid-2-col" style="padding: 0; margin: 0;">
             <section class="card">
                 <h2>The Origin Story</h2>
                 <hr style="border: 1px solid var(--accent); margin: 10px 0;">
-                <p>The brownie wasn't an accident; it was a carefully crafted masterpiece. In 1893, socialite <strong>Bertha Palmer</strong> asked the pastry chef at the Palmer House Hotel in Chicago to create a dessert suitable for women attending the Chicago World's Columbian Exposition.</p>
+                <p>The brownie wasn't an accident; it was a crafted masterpiece. In 1893, socialite <strong>Bertha Palmer</strong> asked the pastry chef at the Palmer House Hotel in Chicago to create a dessert suitable for women attending the Chicago World's Columbian Exposition.</p>
                 <br>
-                <p>She requested a cake-like confection smaller than a piece of cake that could be easily eaten from boxed lunches. The result? The Palmer House Brownie, made with a decadent amount of chocolate, walnuts, and an apricot glaze. Remarkably, the hotel still serves the original recipe to this day!</p>
+                <p>She requested a cake-like confection that could be easily eaten from boxed lunches. The result? The Palmer House Brownie, made with a decadent amount of chocolate, walnuts, and an apricot glaze. The hotel still serves the original recipe today!</p>
             </section>
-
-            <img src="https://images.unsplash.com/photo-1606313564200-e75d5e30476c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Delicious stack of fudgy brownies" class="hero-img">
+            <img src="https://images.unsplash.com/photo-1606313564200-e75d5e30476c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Fudgy brownies" class="hero-img">
         </div>
 
         <section class="card">
             <h2>Expert Research: Fun Facts & Statistics</h2>
             <hr style="border: 1px solid var(--accent); margin: 10px 0;">
             <ul style="margin-left: 20px; margin-top: 10px;">
-                <li><strong>The 3,000-Pound Behemoth:</strong> In 2001, an artisanal bakery in the Hudson Valley, New York, created the largest brownie on record. It weighed 3,000 pounds and was made with 750 lbs of chocolate chips and 500 lbs of butter.</li>
-                <li><strong>The Name's Origin:</strong> The word "brownie" originally referenced mythical elf-like creatures found in Scottish folklore, made famous in the US by author Palmer Cox in the late 1800s. Early "brownie" recipes were actually molasses cakes; the chocolate variety didn't appear in cookbooks until 1904.</li>
-                <li><strong>Consumption Statistics:</strong> It is estimated that Americans consume over 1.5 billion brownies every year. Furthermore, a massive culinary debate divides consumers: 52% of people prefer "fudgy" brownies, while around 24% prefer "cakey" (the rest fall into the chewy or un-opinionated categories).</li>
+                <li><strong>The 3,000-Pound Behemoth:</strong> In 2001, a bakery in New York created the largest brownie on record. It weighed 3,000 pounds!</li>
+                <li><strong>The Name's Origin:</strong> The word "brownie" originally referenced mythical elf-like creatures found in Scottish folklore. Early "brownie" recipes were actually molasses cakes.</li>
+                <li><strong>Consumption Statistics:</strong> It is estimated that Americans consume over 1.5 billion brownies every year. Furthermore, 52% of people prefer "fudgy" brownies, while 24% prefer "cakey".</li>
             </ul>
         </section>
     </div>
 
+    <script>
+        document.querySelectorAll('nav a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                // Only intercept if it's going to a different page
+                if (this.href !== window.location.href) {
+                    e.preventDefault();
+                    
+                    // Play a soft UI "pop" sound
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.1);
+
+                    // Trigger out animation
+                    document.body.classList.add('page-leave');
+                    
+                    // Navigate after animation finishes
+                    setTimeout(() => {
+                        window.location.href = this.href;
+                    }, 400);
+                }
+            });
+        });
+    </script>
 </body>
 </html>
