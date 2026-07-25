@@ -10,14 +10,14 @@ body{
     background:#f5e7d6;
 }
 body.page-enter{
-    animation:pageIn .25s ease;
+    animation:pageIn .15s ease-out;
 }
 body.page-exit{
     opacity:0;
-    transition:opacity .22s ease;
+    transition:opacity .15s ease-in;
 }
 @keyframes pageIn{
-    from{opacity:0}
+    from{opacity:.4}
     to{opacity:1}
 }
 nav{
