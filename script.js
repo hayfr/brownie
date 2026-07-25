@@ -9,13 +9,15 @@ document.addEventListener("DOMContentLoaded",()=>{
         cover.classList.add("hide");
     });
 
-    document.querySelectorAll("nav a").forEach(link=>{
+    document.querySelectorAll("nav a,.btn").forEach(link=>{
         const nextPage=link.getAttribute("href");
 
-        if(nextPage===currentPage)link.classList.add("active");
+        if(link.closest("nav")&&nextPage===currentPage){
+            link.classList.add("active");
+        }
 
         link.addEventListener("click",e=>{
-            if(nextPage===currentPage)return;
+            if(!nextPage||nextPage.startsWith("#")||nextPage===currentPage)return;
 
             e.preventDefault();
             pageSound.currentTime=0;
@@ -31,7 +33,5 @@ document.addEventListener("DOMContentLoaded",()=>{
 
 window.addEventListener("pageshow",()=>{
     const cover=document.getElementById("pageCover");
-    requestAnimationFrame(()=>{
-        cover.classList.add("hide");
-    });
+    if(cover)requestAnimationFrame(()=>cover.classList.add("hide"));
 });
