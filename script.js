@@ -1,15 +1,8 @@
 const pageSound=new Audio("https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3");
 pageSound.volume=.15;
-pageSound.preload="auto";
-
-window.addEventListener("pageshow",()=>{
-    document.body.classList.remove("page-hide");
-    requestAnimationFrame(()=>{
-        document.body.classList.add("page-show");
-    });
-});
 
 document.addEventListener("DOMContentLoaded",()=>{
+    document.body.classList.add("page-enter");
     const currentPage=window.location.pathname.split("/").pop()||"index.html";
     document.querySelectorAll("nav a").forEach(link=>{
         const nextPage=link.getAttribute("href");
@@ -19,11 +12,15 @@ document.addEventListener("DOMContentLoaded",()=>{
             e.preventDefault();
             pageSound.currentTime=0;
             pageSound.play().catch(()=>{});
-            document.body.classList.remove("page-show");
-            document.body.classList.add("page-hide");
+            document.body.classList.remove("page-enter");
+            document.body.classList.add("page-exit");
             setTimeout(()=>{
-                window.location.href=link.href;
-            },300);
+                window.location.href=nextPage;
+            },220);
         });
     });
+});
+
+window.addEventListener("pageshow",()=>{
+    document.body.classList.remove("page-exit");
 });
