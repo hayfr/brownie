@@ -8,14 +8,17 @@ body{
     color:#3b2115;
     font-family:"Trebuchet MS",Arial,sans-serif;
     background:#f5e7d6;
-    opacity:0;
-    transition:opacity .3s ease;
 }
-body.page-show{
-    opacity:1;
+body.page-enter{
+    animation:pageIn .25s ease;
 }
-body.page-hide{
+body.page-exit{
     opacity:0;
+    transition:opacity .22s ease;
+}
+@keyframes pageIn{
+    from{opacity:0}
+    to{opacity:1}
 }
 nav{
     padding:15px;
