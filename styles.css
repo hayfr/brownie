@@ -9,16 +9,13 @@ body{
     font-family:"Trebuchet MS",Arial,sans-serif;
     background:#f5e7d6;
     opacity:0;
-    transform:translateY(8px);
-    transition:opacity .25s,transform .25s;
+    transition:opacity .3s ease;
 }
 body.page-show{
     opacity:1;
-    transform:translateY(0);
 }
 body.page-hide{
     opacity:0;
-    transform:translateY(8px);
 }
 nav{
     padding:15px;
