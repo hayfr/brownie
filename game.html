@@ -2,221 +2,215 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brownie Tower Game | The Brownie Bite</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>Brownie Stacker | The Brownie Bite</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍫</text></svg>">
     <link rel="stylesheet" href="styles.css">
+    <script src="script.js" defer></script>
 </head>
 <body>
-
     <nav>
         <ul>
-            <li><a href="index.html">History & Facts</a></li>
-            <li><a href="recipe.html">The Ultimate Recipe</a></li>
-            <li><a href="game.html">Brownie Tower Game</a></li>
+            <li><a href="index.html">History</a></li>
+            <li><a href="recipe.html">Recipe</a></li>
+            <li><a href="game.html">Game</a></li>
         </ul>
     </nav>
-
-    <div class="container fade-in">
-        <div class="card game-container">
+    <main class="container">
+        <section class="card game-container">
             <h1>Brownie Stacker</h1>
-            <p>Stack the brownie slabs as high as you can! Click the button or press <strong>Spacebar</strong> to drop the sliding slab. Time it perfectly to avoid losing pieces of your brownie.</p>
-            
-            <h2 style="margin-top: 1rem;">Score: <span id="score">0</span></h2>
-            
+            <p>Press the button or spacebar to drop each moving brownie. Try to build the tallest tower possible.</p>
+            <div class="game-info">
+                <span>Score: <span id="score">0</span></span>
+                <span>Best: <span id="best">0</span></span>
+            </div>
             <canvas id="gameCanvas" width="400" height="500"></canvas>
-            
-            <button class="btn" id="actionBtn">Start / Drop Brownie</button>
-        </div>
-    </div>
-
+            <p id="message">Press start to begin.</p>
+            <button class="btn" id="actionBtn">Start Game</button>
+        </section>
+    </main>
+    <footer>
+        <p>The Brownie Bite © 2026</p>
+    </footer>
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const scoreElement = document.getElementById('score');
-        const actionBtn = document.getElementById('actionBtn');
-
-        // Game state
-        let state = 'start'; // start, playing, gameover
-        let score = 0;
-        let blocks = [];
-        let currentBlock;
-        let scrollY = 0;
-
-        // Block settings
-        const blockHeight = 30;
-        const speedMultiplier = 0.2;
-
-        // Audio Context (Synthesized Sounds)
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
-        function playSound(type) {
-            if(audioCtx.state === 'suspended') audioCtx.resume();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            
-            if (type === 'drop') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.1);
-            } else if (type === 'over') {
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
-                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.5);
+        const canvas=document.getElementById("gameCanvas");
+        const ctx=canvas.getContext("2d");
+        const scoreText=document.getElementById("score");
+        const bestText=document.getElementById("best");
+        const message=document.getElementById("message");
+        const actionBtn=document.getElementById("actionBtn");
+        const blockHeight=24;
+        const depth=12;
+        const step=36;
+        let blocks=[];
+        let current;
+        let score=0;
+        let best=Number(localStorage.getItem("brownieBest"))||0;
+        let state="start";
+        let scroll=0;
+        bestText.textContent=best;
+        class Brownie{
+            constructor(x,y,width,direction,speed){
+                this.x=x;
+                this.y=y;
+                this.width=width;
+                this.direction=direction;
+                this.speed=speed;
             }
-        }
-
-        class Block {
-            constructor(x, y, width, direction, speed) {
-                this.x = x;
-                this.y = y;
-                this.width = width;
-                this.height = blockHeight;
-                this.direction = direction;
-                this.speed = speed;
-                this.color = `#${Math.floor(Math.random()*2 + 3)}C1${Math.floor(Math.random()*4 + 2)}03`; // Random shades of chocolate
+            update(){
+                this.x+=this.speed*this.direction;
+                if(this.x<=0){
+                    this.x=0;
+                    this.direction=1;
+                }
+                if(this.x+this.width+depth>=canvas.width){
+                    this.x=canvas.width-this.width-depth;
+                    this.direction=-1;
+                }
             }
-
-            draw() {
-                // Draw base brownie
-                ctx.fillStyle = '#3d1c00'; // Dark choc
-                ctx.fillRect(this.x, this.y + scrollY, this.width, this.height);
-                
-                // Draw lighter chocolate frosting top
-                ctx.fillStyle = '#5c2a00';
-                ctx.fillRect(this.x, this.y + scrollY, this.width, this.height - 5);
-                
-                // Outline
-                ctx.strokeStyle = '#2C1203';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(this.x, this.y + scrollY, this.width, this.height);
-            }
-
-            update() {
-                this.x += this.speed * this.direction;
-                if (this.x <= 0 || this.x + this.width >= canvas.width) {
-                    this.direction *= -1; // Reverse direction on wall hit
+            draw(){
+                const x=this.x;
+                const y=this.y+scroll;
+                const w=this.width;
+                ctx.fillStyle="#3a1a10";
+                ctx.beginPath();
+                ctx.moveTo(x,y);
+                ctx.lineTo(x+depth,y+depth);
+                ctx.lineTo(x+depth,y+depth+blockHeight);
+                ctx.lineTo(x,y+blockHeight);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle="#241009";
+                ctx.stroke();
+                ctx.fillStyle="#4d2416";
+                ctx.beginPath();
+                ctx.moveTo(x+depth,y+depth);
+                ctx.lineTo(x+w+depth,y+depth);
+                ctx.lineTo(x+w+depth,y+depth+blockHeight);
+                ctx.lineTo(x+depth,y+depth+blockHeight);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle="#78432b";
+                ctx.beginPath();
+                ctx.moveTo(x,y);
+                ctx.lineTo(x+w,y);
+                ctx.lineTo(x+w+depth,y+depth);
+                ctx.lineTo(x+depth,y+depth);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                const chips=Math.max(1,Math.floor(w/45));
+                for(let i=0;i<chips;i++){
+                    const chipX=x+(i+1)*w/(chips+1)+depth/2;
+                    const chipY=y+5+(i%2)*4;
+                    ctx.fillStyle="#2b130c";
+                    ctx.beginPath();
+                    ctx.ellipse(chipX,chipY,3,2,0,0,Math.PI*2);
+                    ctx.fill();
+                }
+                if(w>65){
+                    ctx.strokeStyle="#4a2418";
+                    ctx.lineWidth=2;
+                    ctx.beginPath();
+                    ctx.moveTo(x+w*.42,y+3);
+                    ctx.lineTo(x+w*.48,y+7);
+                    ctx.lineTo(x+w*.44,y+11);
+                    ctx.stroke();
                 }
             }
         }
-
-        function initGame() {
-            blocks = [];
-            score = 0;
-            scrollY = 0;
-            scoreElement.innerText = score;
-            
-            // Base block
-            blocks.push(new Block(100, canvas.height - blockHeight, 200, 0, 0));
-            
+        function startGame(){
+            blocks=[];
+            score=0;
+            scroll=0;
+            scoreText.textContent=score;
+            blocks.push(new Brownie(94,440,200,0,0));
+            state="playing";
+            message.textContent="";
+            actionBtn.textContent="Drop Brownie";
             spawnBlock();
-            state = 'playing';
-            actionBtn.innerText = "Drop Brownie!";
-            gameLoop();
         }
-
-        function spawnBlock() {
-            let lastBlock = blocks[blocks.length - 1];
-            let yPos = lastBlock.y - blockHeight;
-            let speed = 2 + (score * speedMultiplier); // Gets faster
-            currentBlock = new Block(0, yPos, lastBlock.width, 1, speed);
-            
-            // Pan camera up if getting too high
-            if (yPos + scrollY < 150) {
-                scrollY += blockHeight;
-            }
+        function spawnBlock(){
+            const last=blocks[blocks.length-1];
+            const direction=score%2===0?1:-1;
+            const x=direction===1?0:canvas.width-last.width-depth;
+            const speed=Math.min(2+score*.15,5);
+            current=new Brownie(x,last.y-step,last.width,direction,speed);
+            if(current.y+scroll<110)scroll+=step;
         }
-
-        function placeBlock() {
-            playSound('drop');
-            let lastBlock = blocks[blocks.length - 1];
-            
-            // Calculate overlap
-            let overlapStart = Math.max(currentBlock.x, lastBlock.x);
-            let overlapEnd = Math.min(currentBlock.x + currentBlock.width, lastBlock.x + lastBlock.width);
-            let overlapWidth = overlapEnd - overlapStart;
-
-            if (overlapWidth <= 0) {
-                // Missed completely
-                state = 'gameover';
-                playSound('over');
-                actionBtn.innerText = "Game Over - Try Again";
+        function dropBlock(){
+            const last=blocks[blocks.length-1];
+            let start=Math.max(current.x,last.x);
+            let end=Math.min(current.x+current.width,last.x+last.width);
+            let overlap=end-start;
+            if(overlap<=3){
+                state="gameover";
+                message.textContent="The brownie missed the tower!";
+                actionBtn.textContent="Try Again";
                 return;
             }
-
-            // Cut the block
-            currentBlock.x = overlapStart;
-            currentBlock.width = overlapWidth;
-            currentBlock.speed = 0; // Stop moving
-            
-            blocks.push(currentBlock);
+            if(Math.abs(current.x-last.x)<5){
+                start=last.x;
+                overlap=last.width;
+                message.textContent="Perfect drop!";
+            }else{
+                message.textContent="";
+            }
+            current.x=start;
+            current.width=overlap;
+            current.speed=0;
+            blocks.push(current);
             score++;
-            scoreElement.innerText = score;
-            
+            scoreText.textContent=score;
+            if(score>best){
+                best=score;
+                bestText.textContent=best;
+                localStorage.setItem("brownieBest",best);
+            }
             spawnBlock();
         }
-
-        function drawBackground() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // Draw grid lines for clean layout feel
-            ctx.strokeStyle = 'rgba(139, 90, 51, 0.1)';
-            ctx.lineWidth = 1;
-            for(let i=0; i<canvas.width; i+=40) {
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+        function drawBackground(){
+            ctx.fillStyle="#f5e7d6";
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.strokeStyle="rgba(109,61,37,.12)";
+            ctx.lineWidth=1;
+            for(let y=0;y<canvas.height;y+=40){
+                ctx.beginPath();
+                ctx.moveTo(0,y);
+                ctx.lineTo(canvas.width,y);
+                ctx.stroke();
             }
-            for(let i=0; i<canvas.height; i+=40) {
-                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
-            }
+            ctx.fillStyle="#d5ad82";
+            ctx.fillRect(0,475,canvas.width,25);
         }
-
-        function gameLoop() {
-            if (state !== 'playing') return;
-            
+        function gameLoop(){
             drawBackground();
-            
-            blocks.forEach(b => b.draw());
-            
-            currentBlock.update();
-            currentBlock.draw();
-            
+            blocks.forEach(block=>block.draw());
+            if(current){
+                if(state==="playing")current.update();
+                current.draw();
+            }
+            if(state==="start"){
+                ctx.fillStyle="#5a2f1d";
+                ctx.font="bold 20px Trebuchet MS";
+                ctx.textAlign="center";
+                ctx.fillText("Press Start to Build",canvas.width/2,canvas.height/2);
+            }
             requestAnimationFrame(gameLoop);
         }
-
-        // Event Listeners
-        function handleAction() {
-            if (state === 'start' || state === 'gameover') {
-                initGame();
-            } else if (state === 'playing') {
-                placeBlock();
-            }
+        function handleAction(){
+            if(state==="start"||state==="gameover")startGame();
+            else dropBlock();
         }
-
-        actionBtn.addEventListener('click', handleAction);
-        
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
+        actionBtn.addEventListener("click",handleAction);
+        window.addEventListener("keydown",e=>{
+            if(e.code==="Space"){
                 e.preventDefault();
                 handleAction();
             }
         });
-
-        // Initial draw
-        drawBackground();
-        ctx.fillStyle = '#4A2511';
-        ctx.font = '20px Poppins';
-        ctx.textAlign = 'center';
-        ctx.fillText("Press Start to Bake the Tower", canvas.width/2, canvas.height/2);
-
+        gameLoop();
     </script>
 </body>
 </html>
