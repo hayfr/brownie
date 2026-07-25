@@ -1,23 +1,42 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="loading">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <title>Brownies</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍫</text></svg>">
-    <link rel="stylesheet" href="styles.css">
-    <script src="script.js" defer></script>
-<link rel="stylesheet" href="styles.css" onload="document.documentElement.classList.remove('loading')">
-<noscript>
+    <title>The Brownie Bite</title>
     <style>
-        html.loading body{
-            visibility:visible;
+        html{background:#f5e7d6}
+        body{margin:0}
+        html.loading body>*:not(#pageCover){visibility:hidden}
+        #pageCover{
+            position:fixed;
+            inset:0;
+            z-index:9999;
+            display:grid;
+            place-items:center;
+            background:#f5e7d6;
+            opacity:1;
+            transition:opacity .12s ease;
+        }
+        #pageCover.hide{
+            opacity:0;
+            pointer-events:none;
+        }
+        #pageCover span{
+            font-size:34px;
+            animation:cookieDrop .25s ease-out;
+        }
+        @keyframes cookieDrop{
+            from{opacity:0;transform:translateY(-20px) rotate(-15deg)}
+            to{opacity:1;transform:translateY(0) rotate(0)}
         }
     </style>
-</noscript>
-<script src="script.js" defer></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍫</text></svg>">
+    <link rel="stylesheet" href="styles.css" onload="document.documentElement.classList.remove('loading')">
+    <script src="script.js" defer></script>
 </head>
 <body>
+    <div id="pageCover"><span>🍪</span></div>
     <nav>
         <ul>
             <li><a href="index.html">Brownies</a></li>
@@ -28,8 +47,8 @@
     <main class="container">
         <section class="card hero">
             <div>
-                <h1>Brownies</h1>
-                <p>Brownies are delicious, So this website is about brownies. Lowkey better than cookies.</p>
+                <h1>The Brownie Bite</h1>
+                <p>Welcome to a small website about brownies. Learn how brownies were created, follow an easy recipe, and play a brownie stacking game.</p>
                 <a class="btn" href="recipe.html">View Recipe</a>
             </div>
             <img src="https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=800&q=80" alt="Stack of chocolate brownies">
@@ -52,7 +71,7 @@
         </section>
     </main>
     <footer>
-        <p>Brownies>Cookies</p>
+        <p>The Brownie Bite © 2026</p>
     </footer>
 </body>
 </html>
