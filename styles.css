@@ -187,3 +187,68 @@ footer p{
         font-size:2rem;
     }
 }
+
+.recipe-details {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.recipe-details p {
+    margin: 8px 0;
+}
+
+.recipe-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin: 20px 0 10px;
+}
+
+.serving-button {
+    width: 48px;
+    height: 48px;
+    border: none;
+    border-radius: 50%;
+    background-color: #4b2417;
+    color: white;
+    font-size: 22px;
+    cursor: pointer;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.serving-button:hover:not(:disabled) {
+    background-color: #6b3523;
+    transform: scale(1.1);
+}
+
+.serving-button:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.serving-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+}
+
+.serving-display {
+    display: flex;
+    min-width: 150px;
+    flex-direction: column;
+    text-align: center;
+}
+
+.serving-display strong {
+    font-size: 22px;
+}
+
+.serving-display span {
+    margin-top: 4px;
+}
+
+.control-note {
+    margin-bottom: 20px;
+    font-size: 14px;
+    text-align: center;
+    opacity: 0.75;
+}
