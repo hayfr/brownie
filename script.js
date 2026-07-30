@@ -240,3 +240,96 @@ document.addEventListener("DOMContentLoaded",()=>{
 window.addEventListener("pageshow",()=>{
     document.documentElement.classList.remove("leaving");
 });
+
+document.addEventListener("DOMContentLoaded", () => {
+    const servingCount = document.querySelector("#servingCount");
+    const servingDisplay = document.querySelector("#servingDisplay");
+    const traySize = document.querySelector("#traySize");
+    const decreaseButton = document.querySelector("#decreaseServings");
+    const increaseButton = document.querySelector("#increaseServings");
+    const ingredientAmounts = document.querySelectorAll(".ingredient-amount");
+
+    if (!servingCount || !servingDisplay || !traySize || !decreaseButton || !increaseButton) {
+        return;
+    }
+
+    let batches = 1;
+    const minimumBatches = 1;
+    const maximumBatches = 4;
+
+    const traySizes = {
+        1: "8 × 8-inch square pan",
+        2: "9 × 13-inch pan",
+        3: "one 9 × 13-inch pan and one 8 × 8-inch pan",
+        4: "two 9 × 13-inch pans"
+    };
+
+    function greatestCommonDivisor(a, b) {
+        while (b !== 0) {
+            const remainder = a % b;
+            a = b;
+            b = remainder;
+        }
+
+        return a;
+    }
+
+    function formatAmount(numerator, denominator) {
+        const divisor = greatestCommonDivisor(numerator, denominator);
+
+        numerator /= divisor;
+        denominator /= divisor;
+
+        const wholeNumber = Math.floor(numerator / denominator);
+        const remainder = numerator % denominator;
+
+        if (remainder === 0) {
+            return String(wholeNumber);
+        }
+
+        if (wholeNumber === 0) {
+            return `${remainder}/${denominator}`;
+        }
+
+        return `${wholeNumber} ${remainder}/${denominator}`;
+    }
+
+    function updateRecipe() {
+        const servings = batches * 9;
+
+        servingCount.textContent = servings;
+        servingDisplay.textContent = servings;
+        traySize.textContent = traySizes[batches];
+
+        ingredientAmounts.forEach(amountCell => {
+            const numerator = Number(amountCell.dataset.numerator) * batches;
+            const denominator = Number(amountCell.dataset.denominator);
+            const amount = formatAmount(numerator, denominator);
+            const singularUnit = amountCell.dataset.unitSingular;
+            const pluralUnit = amountCell.dataset.unitPlural;
+            const totalAmount = numerator / denominator;
+            const unit = totalAmount === 1 ? singularUnit : pluralUnit;
+
+            amountCell.textContent = unit ? `${amount} ${unit}` : amount;
+        });
+
+        decreaseButton.disabled = batches === minimumBatches;
+        increaseButton.disabled = batches === maximumBatches;
+    }
+
+    decreaseButton.addEventListener("click", () => {
+        if (batches > minimumBatches) {
+            batches--;
+            updateRecipe();
+        }
+    });
+
+    increaseButton.addEventListener("click", () => {
+        if (batches < maximumBatches) {
+            batches++;
+            updateRecipe();
+        }
+    });
+
+    updateRecipe();
+});
